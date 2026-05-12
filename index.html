@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Central Florida Surf Report 🏄</title>
+
+<!-- PWA Meta Tags -->
+<meta name="theme-color" content="#26c6da">
+<meta name="description" content="Central Florida surf conditions — wave height, water temp, tide, wind, and best spot recommendations for the Space Coast.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Surf Report">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+
+  :root {
+    --ocean-dark: #0a1628;
+    --ocean-mid: #0f2847;
+    --ocean-light: #1a4a7a;
+    --foam: #e0f7fa;
+    --sand: #f5deb3;
+    --sun: #ffd54f;
+    --coral: #ff7043;
+    --teal: #26c6da;
+    --green: #66bb6a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(180deg, var(--ocean-dark) 0%, var(--ocean-mid) 40%, var(--ocean-light) 100%);
+    min-height: 100vh;
+    color: #fff;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Safe area for notched phones */
+  body { padding-top: env(safe-area-inset-top); }
+
+  /* ---- Wave animation header ---- */
+  .wave-header {
+    position: relative; width: 100%; height: 160px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #0a1628 0%, #0d2240 100%);
+  }
+  .wave-header h1 {
+    position: relative; z-index: 2; text-align: center;
+    padding-top: 32px; font-size: 1.8rem; font-weight: 700;
+    letter-spacing: 1px; text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  }
+  .wave-header h1 span { color: var(--teal); }
+  .wave-header p {
+    position: relative; z-index: 2; text-align: center;
+    font-size: 0.9rem; opacity: 0.8; margin-top: 4px;
+  }
+  .wave {
+    position: absolute; bottom: 0; left: 0;
+    width: 200%; height: 70px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 100'%3E%3Cpath fill='%231a4a7a' fill-opacity='0.4' d='M0,40 C360,100 720,0 1080,50 C1260,75 1380,30 1440,40 L1440,100 L0,100 Z'/%3E%3C/svg%3E") repeat-x;
+    background-size: 50% 100%;
+    animation: waveAnim 8s linear infinite;
+  }
+  .wave:nth-child(2) {
+    bottom: 0; height: 55px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 100'%3E%3Cpath fill='%2326c6da' fill-opacity='0.25' d='M0,60 C320,10 640,90 960,30 C1120,10 1320,70 1440,50 L1440,100 L0,100 Z'/%3E%3C/svg%3E") repeat-x;
+    background-size: 50% 100%;
+    animation: waveAnim 12s linear infinite reverse;
+  }
+  @keyframes waveAnim {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* ---- Controls ---- */
+  .controls {
+    display: flex; justify-content: center; gap: 14px;
+    flex-wrap: wrap; padding: 24px 16px 10px;
+  }
+  .control-group { text-align: center; flex: 1; min-width: 150px; max-width: 240px; }
+  .control-group label {
+    display: block; font-size: 0.78rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 6px; color: var(--teal);
+  }
+  .control-group select {
+    width: 100%; padding: 10px 14px; font-size: 0.95rem;
+    font-family: 'Poppins', sans-serif;
+    border: 2px solid var(--teal); border-radius: 12px;
+    background: rgba(255,255,255,0.08); color: #fff;
+    cursor: pointer; transition: all 0.3s;
+    -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2326c6da' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+  .control-group select:focus {
+    outline: none; border-color: var(--sun);
+    box-shadow: 0 0 12px rgba(255,213,79,0.3);
+  }
+  .control-group select option { background: var(--ocean-mid); color: #fff; }
+
+  .btn-report {
+    width: 100%; max-width: 500px; margin: 14px auto 0;
+    display: block; padding: 12px 30px;
+    font-size: 1rem; font-family: 'Poppins', sans-serif; font-weight: 600;
+    background: linear-gradient(135deg, var(--teal), #0097a7);
+    color: #fff; border: none; border-radius: 12px;
+    cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-report:hover, .btn-report:active {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(38,198,218,0.4);
+  }
+
+  /* ---- Offline Banner ---- */
+  .offline-banner {
+    display: none; text-align: center; padding: 8px;
+    background: var(--coral); font-size: 0.8rem; font-weight: 600;
+  }
+  .offline-banner.show { display: block; }
+
+  /* ---- Section titles ---- */
+  .section-title {
+    text-align: center; font-size: 1.2rem;
+    font-weight: 600; margin: 24px 0 14px; padding: 0 16px;
+  }
+  .section-title .emoji { font-size: 1.4rem; }
+
+  /* ---- Stat Cards ---- */
+  .stat-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px; padding: 0 16px 16px;
+    max-width: 700px; margin: 0 auto;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px; padding: 18px 14px;
+    text-align: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  }
+  .stat-card .icon { font-size: 2rem; margin-bottom: 6px; }
+  .stat-card .label {
+    font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--teal); margin-bottom: 4px;
+  }
+  .stat-card .value { font-size: 1.5rem; font-weight: 700; }
+  .stat-card .detail { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; }
+
+  /* ---- Recommendation Box ---- */
+  .recommendation {
+    max-width: 700px; margin: 10px auto 24px;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, rgba(102,187,106,0.15), rgba(38,198,218,0.15));
+    border: 1px solid rgba(102,187,106,0.3); border-radius: 16px;
+    text-align: center; margin-left: 16px; margin-right: 16px;
+  }
+  .recommendation h3 { font-size: 1.05rem; color: var(--green); margin-bottom: 8px; }
+  .recommendation .best-spot { font-size: 1.4rem; font-weight: 700; color: var(--sun); margin-bottom: 6px; }
+  .recommendation .reason { font-size: 0.88rem; opacity: 0.85; line-height: 1.5; }
+
+  /* ---- Comparison Table ---- */
+  .table-wrap {
+    overflow-x: auto; padding: 0 16px 30px;
+    max-width: 960px; margin: 0 auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table {
+    width: 100%; border-collapse: collapse;
+    background: rgba(255,255,255,0.06);
+    border-radius: 14px; overflow: hidden;
+    min-width: 580px;
+  }
+  thead th {
+    background: rgba(38,198,218,0.2); padding: 12px 10px;
+    font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--teal); white-space: nowrap;
+  }
+  tbody td {
+    padding: 10px 8px; text-align: center;
+    font-size: 0.88rem; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  tbody tr:hover { background: rgba(255,255,255,0.04); }
+  tbody tr.highlight { background: rgba(102,187,106,0.12); font-weight: 600; }
+  .star { color: var(--sun); }
+
+  /* Badges */
+  .badge {
+    display: inline-block; padding: 3px 10px;
+    border-radius: 8px; font-size: 0.72rem; font-weight: 600;
+  }
+  .badge-good { background: rgba(102,187,106,0.25); color: #a5d6a7; }
+  .badge-fair { background: rgba(255,213,79,0.25); color: #fff176; }
+  .badge-poor { background: rgba(255,112,67,0.25); color: #ff8a65; }
+
+  /* ---- Install Prompt ---- */
+  .install-prompt {
+    display: none; max-width: 500px; margin: 0 auto 16px;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, rgba(255,213,79,0.15), rgba(38,198,218,0.1));
+    border: 1px solid rgba(255,213,79,0.3); border-radius: 14px;
+    text-align: center; margin-left: 16px; margin-right: 16px;
+  }
+  .install-prompt.show { display: block; }
+  .install-prompt p { font-size: 0.85rem; margin-bottom: 10px; opacity: 0.9; }
+  .install-btn {
+    padding: 8px 24px; font-size: 0.9rem;
+    font-family: 'Poppins', sans-serif; font-weight: 600;
+    background: var(--sun); color: var(--ocean-dark);
+    border: none; border-radius: 10px; cursor: pointer;
+    margin-right: 8px; transition: transform 0.2s;
+  }
+  .install-btn:hover { transform: translateY(-1px); }
+  .dismiss-btn {
+    padding: 8px 16px; font-size: 0.85rem;
+    font-family: 'Poppins', sans-serif;
+    background: transparent; color: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.2); border-radius: 10px;
+    cursor: pointer;
+  }
+
+  .hidden { display: none; }
+
+  footer {
+    text-align: center; padding: 20px 16px;
+    font-size: 0.7rem; opacity: 0.5;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+
+  @media (max-width: 400px) {
+    .wave-header h1 { font-size: 1.4rem; padding-top: 24px; }
+    .wave-header { height: 130px; }
+    .stat-cards { grid-template-columns: repeat(2, 1fr); }
+    .stat-card .value { font-size: 1.3rem; }
+    .section-title { font-size: 1.05rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Offline Banner -->
+<div class="offline-banner" id="offlineBanner">📡 You're offline — showing cached data</div>
+
+<!-- Wave Header -->
+<div class="wave-header">
+  <h1>🏄 Central Florida <span>Surf Report</span></h1>
+  <p>Real-time conditions for the Space Coast</p>
+  <div class="wave"></div>
+  <div class="wave"></div>
+</div>
+
+<!-- Install Prompt -->
+<div class="install-prompt" id="installPrompt">
+  <p>📲 Install this app on your phone for quick access!</p>
+  <button class="install-btn" id="installBtn" onclick="installApp()">Install App</button>
+  <button class="dismiss-btn" onclick="dismissInstall()">Not Now</button>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="control-group">
+    <label>📍 Surf Spot</label>
+    <select id="spotSelect">
+      <option value="Sebastian Inlet">Sebastian Inlet</option>
+      <option value="Cocoa Beach">Cocoa Beach</option>
+      <option value="Satellite Beach">Satellite Beach</option>
+      <option value="Melbourne Beach">Melbourne Beach</option>
+      <option value="2nd Light">2nd Light</option>
+      <option value="Playalinda Beach">Playalinda Beach</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>📅 Day of Week</label>
+    <select id="daySelect">
+      <option value="Monday">Monday</option>
+      <option value="Tuesday">Tuesday</option>
+      <option value="Wednesday">Wednesday</option>
+      <option value="Thursday">Thursday</option>
+      <option value="Friday">Friday</option>
+      <option value="Saturday">Saturday</option>
+      <option value="Sunday">Sunday</option>
+    </select>
+  </div>
+</div>
+<div style="padding: 0 16px;">
+  <button class="btn-report" onclick="generateReport()">🔍 Get Surf Report</button>
+</div>
+
+<!-- Report Output -->
+<div id="reportOutput" class="hidden">
+
+  <div class="section-title"><span class="emoji">📊</span> Conditions at <span id="reportSpotName"></span> — <span id="reportDayName"></span></div>
+  <div class="stat-cards">
+    <div class="stat-card">
+      <div class="icon">🌊</div>
+      <div class="label">Wave Height</div>
+      <div class="value" id="waveHeight"></div>
+      <div class="detail" id="waveDesc"></div>
+    </div>
+    <div class="stat-card">
+      <div class="icon">🌡️</div>
+      <div class="label">Water Temp</div>
+      <div class="value" id="waterTemp"></div>
+      <div class="detail" id="tempDesc"></div>
+    </div>
+    <div class="stat-card">
+      <div class="icon">🌅</div>
+      <div class="label">Tide Height</div>
+      <div class="value" id="tideHeight"></div>
+      <div class="detail" id="tideDesc"></div>
+    </div>
+    <div class="stat-card">
+      <div class="icon">💨</div>
+      <div class="label">Wind</div>
+      <div class="value" id="windSpeed"></div>
+      <div class="detail" id="windDir"></div>
+    </div>
+    <div class="stat-card">
+      <div class="icon">⭐</div>
+      <div class="label">Overall Rating</div>
+      <div class="value" id="rating"></div>
+      <div class="detail" id="ratingBadge"></div>
+    </div>
+  </div>
+
+  <div class="recommendation">
+    <h3>🏆 Best Spot Recommendation for <span id="recDay"></span></h3>
+    <div class="best-spot" id="bestSpot"></div>
+    <div class="reason" id="bestReason"></div>
+  </div>
+
+  <div class="section-title"><span class="emoji">📋</span> All Spots Comparison — <span id="tableDayName"></span></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Spot</th><th>🌊 Waves</th><th>🌡️ Temp</th>
+          <th>🌅 Tide</th><th>💨 Wind</th><th>⭐ Rating</th><th>Conditions</th>
+        </tr>
+      </thead>
+      <tbody id="compTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<footer>🌴 Central Florida Surf Report PWA — Data is simulated for demonstration. Always check local conditions before heading out. Surf safe! 🤙</footer>
+
+<script>
+  // ===============================================================
+  //  SERVICE WORKER REGISTRATION
+  // ===============================================================
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('./sw.js')
+        .then(function(reg) {
+          console.log('[App] Service worker registered, scope:', reg.scope);
+        })
+        .catch(function(err) {
+          console.log('[App] Service worker registration failed:', err);
+        });
+    });
+  }
+
+  // ===============================================================
+  //  INSTALL PROMPT (A2HS — Add to Home Screen)
+  // ===============================================================
+
+  let deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Show custom install prompt
+    document.getElementById('installPrompt').classList.add('show');
+  });
+
+  function installApp() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(choiceResult) {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('[App] User accepted install');
+        }
+        deferredPrompt = null;
+        document.getElementById('installPrompt').classList.remove('show');
+      });
+    }
+  }
+
+  function dismissInstall() {
+    document.getElementById('installPrompt').classList.remove('show');
+  }
+
+  // Detect online / offline
+  window.addEventListener('online', function() {
+    document.getElementById('offlineBanner').classList.remove('show');
+  });
+  window.addEventListener('offline', function() {
+    document.getElementById('offlineBanner').classList.add('show');
+  });
+  if (!navigator.onLine) {
+    document.getElementById('offlineBanner').classList.add('show');
+  }
+
+  // ===============================================================
+  //  SURF DATA ENGINE
+  // ===============================================================
+
+  const spots = ["Sebastian Inlet", "Cocoa Beach", "Satellite Beach", "Melbourne Beach", "2nd Light", "Playalinda Beach"];
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const windDirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+  function seededRandom(seed) {
+    let x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+  }
+
+  function hashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return hash;
+  }
+
+  const spotBias = {
+    "Sebastian Inlet": 1.6,
+    "Cocoa Beach": 1.0,
+    "Satellite Beach": 0.95,
+    "Melbourne Beach": 0.85,
+    "2nd Light": 1.15,
+    "Playalinda Beach": 1.1
+  };
+
+  function getConditions(spot, day) {
+    const seed = hashCode(spot + day);
+    const r1 = seededRandom(seed);
+    const r2 = seededRandom(seed + 1);
+    const r3 = seededRandom(seed + 2);
+    const r4 = seededRandom(seed + 3);
+    const r5 = seededRandom(seed + 4);
+    const bias = spotBias[spot] || 1.0;
+
+    let waveH = 0.5 + r1 * 3.5 * bias;
+    waveH = Math.round(waveH * 10) / 10;
+    waveH = Math.min(waveH, 6.5);
+
+    let waterT = 74 + r2 * 10;
+    waterT = Math.round(waterT);
+
+    let tideH = 0.2 + r3 * 4.6;
+    tideH = Math.round(tideH * 10) / 10;
+    let tideLbl = tideH < 1.8 ? "Low Tide" : tideH < 3.2 ? "Mid Tide" : "High Tide";
+
+    let windS = 3 + r4 * 19;
+    windS = Math.round(windS);
+    let windD = windDirs[Math.floor(r5 * windDirs.length)];
+
+    let score = (waveH / 6.5) * 50 + ((22 - windS) / 19) * 30 + (tideH > 1.5 && tideH < 4.0 ? 20 : 8);
+    score = Math.round(score);
+    score = Math.max(10, Math.min(100, score));
+
+    let waveDesc = waveH < 1.5 ? "Flat — Ankle slappers" : waveH < 3 ? "Fun — Waist to chest" : waveH < 4.5 ? "Good — Chest to head high" : "Pumping — Overhead+";
+    let tempDesc = waterT < 76 ? "Cool — Wetsuit recommended" : waterT < 80 ? "Comfortable — Shorty or trunks" : "Warm — Board shorts weather";
+    let condLabel = score >= 70 ? "Good" : score >= 45 ? "Fair" : "Poor";
+    let condClass = score >= 70 ? "badge-good" : score >= 45 ? "badge-fair" : "badge-poor";
+
+    return { spot, day, waveH, waterT, tideH, tideLbl, windS, windD, score, waveDesc, tempDesc, condLabel, condClass };
+  }
+
+  // ===============================================================
+  //  GENERATE REPORT
+  // ===============================================================
+
+  function generateReport() {
+    const spot = document.getElementById("spotSelect").value;
+    const day = document.getElementById("daySelect").value;
+    const c = getConditions(spot, day);
+
+    document.getElementById("reportOutput").classList.remove("hidden");
+
+    document.getElementById("reportSpotName").textContent = spot;
+    document.getElementById("reportDayName").textContent = day;
+    document.getElementById("waveHeight").textContent = c.waveH + " ft";
+    document.getElementById("waveDesc").textContent = c.waveDesc;
+    document.getElementById("waterTemp").textContent = c.waterT + "°F";
+    document.getElementById("tempDesc").textContent = c.tempDesc;
+    document.getElementById("tideHeight").textContent = c.tideH + " ft";
+    document.getElementById("tideDesc").textContent = c.tideLbl;
+    document.getElementById("windSpeed").textContent = c.windS + " mph";
+    document.getElementById("windDir").textContent = "Direction: " + c.windD;
+    document.getElementById("rating").textContent = c.score + "/100";
+    document.getElementById("ratingBadge").innerHTML = '<span class="badge ' + c.condClass + '">' + c.condLabel + '</span>';
+
+    // Best spot recommendation
+    let allConditions = spots.map(function(s) { return getConditions(s, day); });
+    allConditions.sort(function(a, b) { return b.score - a.score; });
+    const best = allConditions[0];
+
+    document.getElementById("recDay").textContent = day;
+    document.getElementById("bestSpot").textContent = "🏆 " + best.spot;
+
+    let reasons = [];
+    if (best.waveH >= 3) reasons.push("great wave height (" + best.waveH + " ft)");
+    else if (best.waveH >= 1.5) reasons.push("fun wave height (" + best.waveH + " ft)");
+    else reasons.push("manageable wave height (" + best.waveH + " ft)");
+    if (best.windS <= 10) reasons.push("light winds (" + best.windS + " mph " + best.windD + ")");
+    else reasons.push("winds at " + best.windS + " mph " + best.windD);
+    reasons.push("water temp at " + best.waterT + "°F");
+    reasons.push(best.tideLbl.toLowerCase() + " (" + best.tideH + " ft)");
+
+    document.getElementById("bestReason").textContent =
+      best.spot + " scores highest with a rating of " + best.score + "/100. Expect " + reasons.join(", ") + ". Grab your board and go! 🤙";
+
+    // Comparison table
+    document.getElementById("tableDayName").textContent = day;
+    let tbody = document.getElementById("compTableBody");
+    tbody.innerHTML = "";
+    allConditions.forEach(function(c) {
+      let tr = document.createElement("tr");
+      if (c.spot === best.spot) tr.classList.add("highlight");
+      tr.innerHTML =
+        '<td>' + (c.spot === best.spot ? '<span class="star">★</span> ' : '') + c.spot + '</td>' +
+        '<td>' + c.waveH + ' ft</td>' +
+        '<td>' + c.waterT + '°F</td>' +
+        '<td>' + c.tideH + ' ft <br><small>' + c.tideLbl + '</small></td>' +
+        '<td>' + c.windS + ' mph ' + c.windD + '</td>' +
+        '<td>' + c.score + '/100</td>' +
+        '<td><span class="badge ' + c.condClass + '">' + c.condLabel + '</span></td>';
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("reportOutput").scrollIntoView({ behavior: "smooth" });
+  }
+
+  // ===============================================================
+  //  INIT
+  // ===============================================================
+
+  (function() {
+    const today = new Date();
+    const dayName = days[today.getDay() === 0 ? 6 : today.getDay() - 1];
+    document.getElementById("daySelect").value = dayName;
+  })();
+</script>
+
+</body>
+</html>
