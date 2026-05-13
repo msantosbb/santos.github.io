@@ -240,6 +240,18 @@
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
 
+  /* ---- Tide Chart ---- */
+  .tide-chart-wrap {
+    max-width: 700px; margin: 0 auto 16px; padding: 0 16px;
+  }
+  #tideChart {
+    width: 100%; height: auto;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    display: block;
+  }
+
   @media (max-width: 400px) {
     .wave-header h1 { font-size: 1.4rem; padding-top: 24px; }
     .wave-header { height: 130px; }
@@ -317,16 +329,11 @@
       <div class="detail" id="tempDesc"></div>
     </div>
     <div class="stat-card">
-      <div class="icon">🌅</div>
-      <div class="label">Tide Height</div>
-      <div class="value" id="tideHeight"></div>
-      <div class="detail" id="tideDesc"></div>
-    </div>
-    <div class="stat-card">
       <div class="icon">💨</div>
       <div class="label">Wind</div>
       <div class="value" id="windSpeed"></div>
       <div class="detail" id="windDir"></div>
+      <div class="detail" id="windOnOff" style="margin-top:4px;font-weight:600;font-size:0.72rem;letter-spacing:.5px;"></div>
     </div>
     <div class="stat-card">
       <div class="icon">⭐</div>
@@ -334,6 +341,11 @@
       <div class="value" id="rating"></div>
       <div class="detail" id="ratingBadge"></div>
     </div>
+  </div>
+
+  <div class="section-title"><span class="emoji">🌊</span> Tide Chart — <span id="tideChartDay"></span></div>
+  <div class="tide-chart-wrap">
+    <canvas id="tideChart" width="680" height="220"></canvas>
   </div>
 
   <div class="recommendation">
@@ -499,12 +511,17 @@
     document.getElementById("waveDesc").textContent = c.waveDesc;
     document.getElementById("waterTemp").textContent = c.waterT + "°F";
     document.getElementById("tempDesc").textContent = c.tempDesc;
-    document.getElementById("tideHeight").textContent = c.tideH + " ft";
-    document.getElementById("tideDesc").textContent = c.tideLbl;
     document.getElementById("windSpeed").textContent = c.windS + " mph";
     document.getElementById("windDir").textContent = "Direction: " + c.windD;
+    var windType = getWindType(c.windD);
+    var woel = document.getElementById("windOnOff");
+    woel.textContent = windType.label;
+    woel.style.color = windType.color;
     document.getElementById("rating").textContent = c.score + "/100";
     document.getElementById("ratingBadge").innerHTML = '<span class="badge ' + c.condClass + '">' + c.condLabel + '</span>';
+
+    document.getElementById("tideChartDay").textContent = day;
+    drawTideChart(spot, day, c.tideH);
 
     // Best spot recommendation
     let allConditions = spots.map(function(s) { return getConditions(s, day); });
@@ -545,6 +562,130 @@
     });
 
     document.getElementById("reportOutput").scrollIntoView({ behavior: "smooth" });
+  }
+
+  // ===============================================================
+  //  WIND TYPE (Space Coast — east-facing beaches)
+  // ===============================================================
+
+  function getWindType(dir) {
+    // East-facing shore: E/NE/SE = onshore, W/NW/SW = offshore, N/S = side-shore
+    if (dir === 'E' || dir === 'NE' || dir === 'SE') {
+      return { label: '⬆ Onshore',    color: '#ff8a65' };
+    } else if (dir === 'W' || dir === 'NW' || dir === 'SW') {
+      return { label: '⬇ Offshore',   color: '#66bb6a' };
+    } else {
+      return { label: '↔ Side-shore', color: '#ffd54f' };
+    }
+  }
+
+  // ===============================================================
+  //  TIDE CHART
+  // ===============================================================
+
+  function drawTideChart(spot, day, currentTideH) {
+    const canvas = document.getElementById('tideChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const padL = 48, padR = 24, padT = 28, padB = 42;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+    const maxTide = 5.5;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Generate tidal curve (sinusoidal, ~2 cycles per 24.8 h)
+    const seed = hashCode(spot + day);
+    const phaseOffset = seededRandom(seed + 10) * Math.PI * 2;
+    const amplitude   = 1.3 + seededRandom(seed + 11) * 0.9;
+    const meanLevel   = 1.8 + seededRandom(seed + 12) * 1.1;
+    const tideFreq    = (2 * Math.PI) / 12.4;
+    const numPts = 120;
+    const pts = [];
+    for (let i = 0; i <= numPts; i++) {
+      const t  = (i / numPts) * 24;
+      const tv = meanLevel + amplitude * Math.sin(tideFreq * t + phaseOffset);
+      pts.push({
+        x: padL + (i / numPts) * chartW,
+        y: padT + chartH - (tv / maxTide) * chartH,
+        t: t, tv: tv
+      });
+    }
+
+    // Horizontal grid + Y-axis labels
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    for (let h = 0; h <= 5; h++) {
+      const gy = padT + chartH - (h / maxTide) * chartH;
+      ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(padL + chartW, gy); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.font = '10px Poppins,sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText(h + 'ft', padL - 6, gy + 4);
+    }
+
+    // Vertical grid + X-axis labels
+    const xLabels = [[0,'12am'],[6,'6am'],[12,'12pm'],[18,'6pm'],[24,'12am']];
+    xLabels.forEach(function(pair) {
+      const gx = padL + (pair[0] / 24) * chartW;
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.beginPath(); ctx.moveTo(gx, padT); ctx.lineTo(gx, padT + chartH); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.font = '10px Poppins,sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(pair[1], gx, padT + chartH + 16);
+    });
+
+    // Gradient fill under curve
+    var grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+    grad.addColorStop(0, 'rgba(38,198,218,0.35)');
+    grad.addColorStop(1, 'rgba(38,198,218,0.03)');
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, padT + chartH);
+    ctx.lineTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) {
+      var cx = (pts[i-1].x + pts[i].x) / 2;
+      ctx.bezierCurveTo(cx, pts[i-1].y, cx, pts[i].y, pts[i].x, pts[i].y);
+    }
+    ctx.lineTo(pts[pts.length-1].x, padT + chartH);
+    ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+
+    // Tide curve line
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) {
+      var cx = (pts[i-1].x + pts[i].x) / 2;
+      ctx.bezierCurveTo(cx, pts[i-1].y, cx, pts[i].y, pts[i].x, pts[i].y);
+    }
+    ctx.strokeStyle = '#26c6da'; ctx.lineWidth = 2.5; ctx.stroke();
+
+    // High / Low tide markers
+    for (var i = 1; i < pts.length - 1; i++) {
+      var d1 = pts[i].tv - pts[i-1].tv;
+      var d2 = pts[i+1].tv - pts[i].tv;
+      var isH = d1 >= 0 && d2 < 0;
+      var isL = d1 <= 0 && d2 > 0;
+      if (!isH && !isL) continue;
+      var p = pts[i];
+      var hours   = Math.floor(p.t);
+      var mins    = Math.round((p.t - hours) * 60);
+      var suffix  = hours < 12 ? 'am' : 'pm';
+      var h12     = hours % 12 || 12;
+      var timeStr = h12 + ':' + String(mins).padStart(2, '0') + suffix;
+      ctx.textAlign = 'center';
+      if (isH) {
+        ctx.fillStyle = '#ff7043';
+        ctx.font = 'bold 10px Poppins,sans-serif';
+        ctx.fillText('H ' + p.tv.toFixed(1) + 'ft', p.x, p.y - 14);
+        ctx.font = '9px Poppins,sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillText(timeStr, p.x, p.y - 4);
+      } else {
+        ctx.fillStyle = '#80deea';
+        ctx.font = 'bold 10px Poppins,sans-serif';
+        ctx.fillText('L ' + p.tv.toFixed(1) + 'ft', p.x, p.y + 12);
+        ctx.font = '9px Poppins,sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillText(timeStr, p.x, p.y + 22);
+      }
+    }
+
   }
 
   // ===============================================================
